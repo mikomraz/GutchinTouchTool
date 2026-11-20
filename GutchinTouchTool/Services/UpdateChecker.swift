@@ -146,6 +146,12 @@ class UpdateChecker: ObservableObject {
     // MARK: - Download and install
 
     func downloadAndInstall(url: URL) async {
+        // This fork installs through Homebrew (mikomraz/tap) from reviewed
+        // source; never download and swap in an unverified DMG.
+        status = .error("Self-update is disabled. Run: brew upgrade --cask mikomraz/tap/gutchintouchtool")
+    }
+
+    private func downloadAndInstallUnverified(url: URL) async {
         status = .downloading(progress: 0)
         do {
             let (tmpURL, _) = try await session.downloadFile(from: url)

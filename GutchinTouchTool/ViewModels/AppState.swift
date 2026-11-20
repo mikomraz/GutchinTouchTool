@@ -61,7 +61,7 @@ class AppState: ObservableObject {
         guard NSClassFromString("XCTestCase") == nil else { return }
         DispatchQueue.main.async {
             self.startMonitoring()
-            self.updateChecker.startPeriodicChecks()
+            // Self-update is disabled in this fork; updates come from the Homebrew tap.
         }
     }
 
