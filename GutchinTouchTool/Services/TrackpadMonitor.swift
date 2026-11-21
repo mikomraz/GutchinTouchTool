@@ -113,6 +113,13 @@ class TrackpadMonitor {
 
     // Pinch/rotate tracking
     private var magnification: CGFloat = 0
+
+    // 4-finger pinch/spread (thumb + three fingers), read from raw touches since
+    // macOS doesn't deliver it as a magnify event
+    private var fourFingerPinchBaseline: Float?   // mean finger spread when 4 fingers landed
+    private var fourFingerPinchFired = false      // fire at most once per touch session
+    private let fourFingerPinchInRatio: Float = 0.7
+    private let fourFingerPinchOutRatio: Float = 1.4
     private var rotation: CGFloat = 0
 
     // Tap detection state
@@ -346,6 +353,32 @@ class TrackpadMonitor {
 
         currentFingers = activeFingersCount
 
+        // --- 4-finger pinch / spread (thumb + three fingers) ---
+        if activeFingersCount == 4 && liveTouchPoints.count == 4 {
+            let spread = Self.meanSpread(liveTouchPoints)
+            if let base = fourFingerPinchBaseline {
+                if !fourFingerPinchFired && base > 0 {
+                    let ratio = spread / base
+                    let gesture: TrackpadGesture? =
+                        ratio < fourFingerPinchInRatio ? .fourFingerPinchIn :
+                        ratio > fourFingerPinchOutRatio ? .fourFingerPinchOut : nil
+                    if let gesture {
+                        fourFingerPinchFired = true
+                        gestureConsumed = true // not a 4-finger tap
+                        DispatchQueue.main.async { [self] in
+                            GestureLog.shared.logFromAnyThread("Detected \(gesture.rawValue) (spread ×\(String(format: "%.2f", ratio)))", level: .detect)
+                            fireGesture(gesture)
+                        }
+                    }
+                }
+            } else {
+                fourFingerPinchBaseline = spread
+            }
+        } else if activeFingersCount != 4 {
+            fourFingerPinchBaseline = nil
+            if activeFingersCount == 0 { fourFingerPinchFired = false }
+        }
+
         // --- TipTap detection ---
         // TipTap = one finger PRESSES (clicks), another taps. Sequence: 1→2→1 (or 1→2→0→1)
         // The resting finger must be pressing the trackpad down (force click)
@@ -553,6 +586,14 @@ class TrackpadMonitor {
             resetEdgeDragState()
             stopSuppressingMouse()
         }
+    }
+
+    /// Mean distance of the touches from their centroid (normalized units).
+    private static func meanSpread(_ points: [TouchPoint]) -> Float {
+        let n = Float(points.count)
+        let cx = points.reduce(0) { $0 + $1.x } / n
+        let cy = points.reduce(0) { $0 + $1.y } / n
+        return points.reduce(0) { $0 + hypotf($1.x - cx, $1.y - cy) } / n
     }
 
     // MARK: - Circle gesture helpers

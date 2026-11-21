@@ -50,6 +50,8 @@ enum TrackpadGesture: String, CaseIterable, Identifiable, Codable {
     case fourFingerSwipeLeft = "4 Finger Swipe Left"
     case fourFingerSwipeRight = "4 Finger Swipe Right"
     case fourFingerTap = "4 Finger Tap"
+    case fourFingerPinchIn = "4 Finger Pinch In"
+    case fourFingerPinchOut = "4 Finger Spread"
     case fiveFingerTap = "5 Finger Tap"
 
     // TipTap gestures (one finger rests, another taps)
