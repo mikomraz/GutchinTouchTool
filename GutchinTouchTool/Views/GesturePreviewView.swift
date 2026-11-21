@@ -112,9 +112,9 @@ struct GesturePreviewView: View {
             PinchAnimation(pinchIn: true, animating: animating)
         case .twoFingerPinchOut:
             PinchAnimation(pinchIn: false, animating: animating)
-        case .fourFingerPinchIn:
+        case .threeFingerPinchIn, .fourFingerPinchIn:
             PinchAnimation(pinchIn: true, animating: animating)
-        case .fourFingerPinchOut:
+        case .threeFingerPinchOut, .fourFingerPinchOut:
             PinchAnimation(pinchIn: false, animating: animating)
 
         // Rotate

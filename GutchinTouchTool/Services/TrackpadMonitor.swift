@@ -114,12 +114,12 @@ class TrackpadMonitor {
     // Pinch/rotate tracking
     private var magnification: CGFloat = 0
 
-    // 4-finger pinch/spread (thumb + three fingers), read from raw touches since
-    // macOS doesn't deliver it as a magnify event
-    private var fourFingerPinchBaseline: Float?   // mean finger spread when 4 fingers landed
-    private var fourFingerPinchFired = false      // fire at most once per touch session
-    private let fourFingerPinchInRatio: Float = 0.7
-    private let fourFingerPinchOutRatio: Float = 1.4
+    // 3/4-finger pinch/spread (thumb + two/three fingers), read from raw touches
+    // since macOS doesn't deliver these as magnify events
+    private var pinchBaseline: Float?   // mean finger spread when the current finger count landed
+    private var pinchFired = false      // fire at most once per touch session
+    private let pinchInRatio: Float = 0.7
+    private let pinchOutRatio: Float = 1.4
     private var rotation: CGFloat = 0
 
     // Tap detection state
@@ -353,30 +353,35 @@ class TrackpadMonitor {
 
         currentFingers = activeFingersCount
 
-        // --- 4-finger pinch / spread (thumb + three fingers) ---
-        if activeFingersCount == 4 && liveTouchPoints.count == 4 {
+        // --- 3/4-finger pinch / spread (thumb + two/three fingers) ---
+        // Only when this many fingers is the session's peak, so lifting fingers
+        // off after a 4-finger gesture can't read as a 3-finger pinch.
+        if activeFingersCount != previousFingers || activeFingersCount == 0 {
+            pinchBaseline = nil
+            if activeFingersCount == 0 { pinchFired = false }
+        }
+        if (activeFingersCount == 3 || activeFingersCount == 4),
+           liveTouchPoints.count == activeFingersCount,
+           peakFingers == activeFingersCount, !pinchFired {
             let spread = Self.meanSpread(liveTouchPoints)
-            if let base = fourFingerPinchBaseline {
-                if !fourFingerPinchFired && base > 0 {
-                    let ratio = spread / base
-                    let gesture: TrackpadGesture? =
-                        ratio < fourFingerPinchInRatio ? .fourFingerPinchIn :
-                        ratio > fourFingerPinchOutRatio ? .fourFingerPinchOut : nil
-                    if let gesture {
-                        fourFingerPinchFired = true
-                        gestureConsumed = true // not a 4-finger tap
-                        DispatchQueue.main.async { [self] in
-                            GestureLog.shared.logFromAnyThread("Detected \(gesture.rawValue) (spread ×\(String(format: "%.2f", ratio)))", level: .detect)
-                            fireGesture(gesture)
-                        }
+            if let base = pinchBaseline, base > 0 {
+                let ratio = spread / base
+                let pinchIn = ratio < pinchInRatio
+                let pinchOut = ratio > pinchOutRatio
+                if pinchIn || pinchOut {
+                    let gesture: TrackpadGesture = activeFingersCount == 3
+                        ? (pinchIn ? .threeFingerPinchIn : .threeFingerPinchOut)
+                        : (pinchIn ? .fourFingerPinchIn : .fourFingerPinchOut)
+                    pinchFired = true
+                    gestureConsumed = true // not a tap
+                    DispatchQueue.main.async { [self] in
+                        GestureLog.shared.logFromAnyThread("Detected \(gesture.rawValue) (spread ×\(String(format: "%.2f", ratio)))", level: .detect)
+                        fireGesture(gesture)
                     }
                 }
             } else {
-                fourFingerPinchBaseline = spread
+                pinchBaseline = spread
             }
-        } else if activeFingersCount != 4 {
-            fourFingerPinchBaseline = nil
-            if activeFingersCount == 0 { fourFingerPinchFired = false }
         }
 
         // --- TipTap detection ---
